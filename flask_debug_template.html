@@ -1,0 +1,30 @@
+<html><body>
+
+<p><b>DEBUG</b>
+
+<p>URL:
+   <br>{{request.url}}
+
+<p>Params:
+   <br><ul>{% for k in request.values.keys() %}
+               <li>{{k}}: {{request.values[k]}}</li>
+           {% endfor %}
+       </ul>
+
+<p>Headers:
+   <br><ul>{% for k in request.headers.keys() %}
+               <li>{{k}}: {{request.headers[k]}}</li>
+           {% endfor %}
+       </ul>
+
+<p>Cookies:
+   <br><ul>{% for k in request.cookies.keys() %}
+               <li>{{k}}: {{request.cookies[k]}}</li>
+           {% endfor %}
+       </ul>
+
+<p>More:
+   <br>{{more}}
+
+</body></html>
+

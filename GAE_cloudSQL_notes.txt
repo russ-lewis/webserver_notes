@@ -1,0 +1,19 @@
+- Switched to pymysql, since it's supported on GAE and seems pretty similar
+  mysqlclient.
+
+
+
+
+# to run the local server, you have to set up the "SQL Proxy", which allows
+# remote servers to use a local UNIX socket to represent the server inside
+# the Google network.
+#
+# (Your database should use the *Public* IP, not private - but don't allocate
+# any enabled IP addresses!)
+
+Download the tool onto the local machine:
+    https://cloud.google.com/sql/docs/mysql/sql-proxy
+
+Then run:
+    ./cloud_sql_proxy -dir=/cloudsql -instances=russ-websocket-experiments:us-central1:russ-experiments-sql
+

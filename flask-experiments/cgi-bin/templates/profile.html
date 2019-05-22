@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block body %}
+<p><b>{{username}}</b>
+
+<p>This is the profile for {{username}}.  Does Jinja2 support the use of
+   many different references to the same variable, in this case
+   username={{username}} ?
+
+{% if name == "russ" %}
+  <p>Oh, I see that you are the user "russ."  You will have special
+     priviledges!
+{% endif %}
+
+{% endblock %}
+

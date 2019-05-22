@@ -1,0 +1,36 @@
+Flask on Apache:
+----------------
+
+NOTE: I haven't figured out how to make Flask work with Python3 on EC2.
+      So note the use of 'pip' instead of 'pip3' below.
+
+sudo yum install mod_wsgi
+sudo pip install flask
+
+Write your .wsgi file
+    # why do I have to add this to the path?  Why doesn't it automatically
+    # happen from WSGI???
+    import sys
+    sys.path.insert(0, "/home/ec2-user/flask-experiments/cgi-bin")
+    from flask_experiments import app as application
+
+Add some rules to httpd.conf (see link above)
+    <IfModule wsgi_module>
+      WSGIDaemonProcess app
+               # do *NOT* include a trailing slash here, or it will be
+               # a circle of redirects.  Does this also apply if it's
+               # the root path???
+      WSGIScriptAlias /flask "/home/ec2-user/flask-experiments/cgi-bin/app.wsgi"
+
+      <Directory "/home/ec2-user/flask-experiments/cgi-bin">
+          WSGIProcessGroup app
+          WSGIApplicationGroup %{GLOBAL}
+          Require all granted
+      </Directory>
+    </IfModule>
+
+
+Backing Links (though I had to do *LOTS* of experimentation to make this work!)
+-------------
+http://flask.pocoo.org/docs/1.0/deploying/mod_wsgi/
+

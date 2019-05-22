@@ -1,0 +1,74 @@
+#! /usr/bin/env python3
+
+
+import google.oauth2.credentials
+import google_auth_oauthlib.flow
+
+import MySQLdb
+import private_no_share_dangerous_passwords as pnsdp
+SQL_DB = "oauth_experiments"
+
+import random
+
+
+
+def main():
+    username = "russ"
+
+    conn = MySQLdb.connect(host   = pnsdp.SQL_HOST,
+                           user   = pnsdp.SQL_USER,
+                           passwd = pnsdp.SQL_PASSWD,
+                           db     = SQL_DB)
+
+
+    # Use the client_secret.json file to identify the application requesting
+    # authorization. The client ID (from that file) and access scopes are required.
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+        'client_secret.json',
+        scopes=['https://www.googleapis.com/auth/drive.readonly'])
+
+    # Indicate where the API server will redirect the user after the user completes
+    # the authorization flow. The redirect URI is required.
+    flow.redirect_uri = 'http://%s/oauth_experiments/oauth2callback' % pnsdp.WEB_HOST
+
+    nonce = random_string()
+
+
+    cursor = conn.cursor()
+    cursor.execute("""UPDATE users SET auth_state=%s WHERE username=%s;""", ("authorizing:"+nonce,username))
+    cursor.close()
+    conn.commit()
+    conn.close()
+
+    
+    # Generate URL for request to Google's OAuth 2.0 server.
+    # Use kwargs to set optional request parameters.
+    authorization_url, state = flow.authorization_url(
+        # Enable offline access so that you can refresh an access token without
+        # re-prompting the user for permission. Recommended for web server apps.
+        # DON'T NEED FOR THIS APP access_type='offline',
+
+        state="%s:%s" % (username,nonce),
+
+        # Enable incremental authorization. Recommended as a best practice.
+        include_granted_scopes='true')
+
+    return authorization_url
+
+
+
+def random_string():
+    retval = ""
+    for i in range(16):
+        retval += "%04x" % random.randint(0,65535)
+    return retval
+
+
+
+dest = main()
+assert type(dest) is str
+
+print("Status: 303 See other")
+print("Location: "+dest)
+print()
+

@@ -1,0 +1,137 @@
+#! /usr/bin/env python3
+
+# taken from:
+#    https://docs.python.org/3.4/howto/webservers.html
+
+import cgi
+
+# enable debugging.  Note that the Python docs recommend this for testing, but
+# say that it's a very bad idea to leave enabled in production, as it can leak
+# information about your internal implementation.
+import cgitb
+cgitb.enable(display=0, logdir="/var/log/httpd/cgi_err/")
+
+import google.oauth2.credentials
+import google_auth_oauthlib.flow
+
+import MySQLdb
+import private_no_share_dangerous_passwords as pnsdp
+SQL_DB = "oauth_experiments"
+
+import json
+
+
+
+class FormError(BaseException):
+    def __init__(this, msg):
+        this.msg = msg
+
+def main():
+    # read the CGI variables
+
+    form = cgi.FieldStorage()
+
+    # TODO: handle the "error=access_denied" case.  We currently handle it
+    #       implicitly, viewing it as an invalid auth callback; we want to
+    #       make the state more explicit.
+
+    if "code" not in form or "state" not in form or "scope" not in form:
+        raise FormError("Invalid auth callback")
+
+    code  = form["code"].value
+    state = form["state"].value
+    state_vals = state.split(':')
+    scope  = form["scope"].value
+
+    if len(state_vals) != 2:
+        raise FormError("Invalid state variable")
+
+    username = state_vals[0]
+    nonce    = state_vals[1]
+
+    # now that we know the username, look up that username in the DB.  Is
+    # that user in the middle of authorizing?  If so, does the nonce in the
+    # DB match that which was in the 'state' CGI variable?
+
+    conn = MySQLdb.connect(host   = pnsdp.SQL_HOST,
+                           user   = pnsdp.SQL_USER,
+                           passwd = pnsdp.SQL_PASSWD,
+                           db     = SQL_DB)
+
+    cursor = conn.cursor()
+    cursor.execute("""SELECT auth_state FROM users WHERE username=%s;""", (username,))
+    records = cursor.fetchall()
+    cursor.close()
+
+    if len(records) != 1:
+        raise FormError("Invalid username or auth state: len=%d")
+    record = records[0][0].split(':')
+
+    if len(record) != 2 or record[0] != "authorizing":
+        raise FormError("Invalid record state")
+
+    if nonce != record[1]:
+        raise FormError("Invalid nonce")
+
+    # OK, we know the username and confirmed the nonce; we also have the
+    # 'code' from Google.  'code' is not the actual token which will allow
+    # us to access the resource; it's something which allows us to *get*
+    # that value from Google.  The Flow object automates this process for us.
+
+    flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+        "client_secret.json",
+        scopes=scope,
+        state=state)
+
+    # I'm uncertain why this parameter is important for this Flow object -
+    # since we've *already* done the redirect.  But fetch_token() will raise
+    # an exception if we don't
+    flow.redirect_uri = "http://%s/oauth_experiments/oauth2callback" % pnsdp.WEB_HOST
+
+    flow.fetch_token(code=code)
+
+    credentials = flow.credentials
+    cred_text = json.dumps({"token"        : credentials.token,
+                            "token_uri"    : credentials.token_uri,
+                            "scopes"       : credentials.scopes})
+
+    # update the DB to reflect that we're logged in
+
+    cursor = conn.cursor()
+    cursor.execute("""UPDATE users SET credentials=%s,auth_state="" WHERE username=%s;""", (cred_text,username))
+    cursor.close()
+    conn.commit()
+    conn.close()
+    
+    return "http://%s/oauth_experiments/main?username=%s" % (pnsdp.WEB_HOST, username)
+
+
+    
+def report_error(msg):
+    print("""<html>
+
+<body>
+
+<p>ERROR: %s
+
+</body>
+</html>
+
+""" % msg, end="")
+
+
+
+try:
+    dest = main()
+    assert type(dest) is str
+
+    print("Status: 303 See other")
+    print("Location: "+dest)
+    print()
+
+except FormError as e:
+    print("Content-type: text/html")
+    print()
+    report_error(e.msg)
+
+

@@ -1,0 +1,4 @@
+Works fine, although we get a nasty-gram about a self-signed URL first time
+you access it:
+    https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/SSL-on-amazon-linux-2.html
+
